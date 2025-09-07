@@ -3,13 +3,12 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Day-to-Day Cash Recorder - Made by Ayush Das</title>
+    <title>Day-to-Day Cash Recorder</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Roboto', sans-serif;
             background-color: #000;
-            /* Black background */
             color: #e0e0e0;
             margin: 0;
             padding: 20px;
@@ -18,24 +17,14 @@
         h1 {
             text-align: center;
             color: #1e90ff;
-            /* Blue heading */
             font-weight: 700;
-            margin-bottom: 10px;
-        }
-        
-        .tagline {
-            text-align: center;
-            font-size: 1rem;
-            color: #87cefa;
-            /* Lighter blue */
-            margin-bottom: 25px;
+            margin-bottom: 20px;
         }
         
         .container {
-            max-width: 800px;
+            max-width: 900px;
             margin: auto;
             background: #111;
-            /* Dark panel */
             padding: 20px;
             border-radius: 10px;
             box-shadow: 0 0 15px rgba(30, 144, 255, 0.4);
@@ -95,13 +84,28 @@
         }
         
         .credit {
-            color: #00ffcc;
+            color: #ff4444;
+            /* credit = minus */
             font-weight: bold;
         }
         
         .debit {
-            color: #ff4444;
+            color: #00ffcc;
+            /* debit = plus */
             font-weight: bold;
+        }
+        
+        .delete-btn {
+            background: #ff3333;
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        
+        .delete-btn:hover {
+            background: #cc0000;
         }
         
         .balance {
@@ -124,15 +128,14 @@
 <body>
     <div class="container">
         <h1>Day-to-Day Cash Recorder</h1>
-        <p class="tagline">💡 Made by <strong>Ayush Das</strong></p>
 
         <!-- Form -->
         <form id="transactionForm">
-            <input type="text" id="desc" placeholder="Description" required>
+            <input type="text" id="desc" placeholder="Name / Description" required>
             <input type="number" id="amount" placeholder="Amount" required>
             <select id="type">
-        <option value="credit">Credit</option>
-        <option value="debit">Debit</option>
+        <option value="credit">Credit (-)</option>
+        <option value="debit">Debit (+)</option>
       </select>
             <button type="submit">Add</button>
         </form>
@@ -141,9 +144,11 @@
         <table>
             <thead>
                 <tr>
+                    <th>Sl. No</th>
                     <th>Description</th>
                     <th>Type</th>
                     <th>Amount</th>
+                    <th>Action</th>
                 </tr>
             </thead>
             <tbody id="transactionTable"></tbody>
@@ -158,8 +163,9 @@
         <p class="footer">Day-to-Day Cash Recorder • Works on any device 🌍</p>
     </div>
 
-    <!-- jsPDF Library -->
+    <!-- jsPDF + autoTable -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 
     <script>
         const form = document.getElementById('transactionForm');
@@ -173,18 +179,27 @@
         function renderTransactions() {
             table.innerHTML = "";
             balance = 0;
-            transactions.forEach(t => {
+            transactions.forEach((t, index) => {
+                // Credit = subtract, Debit = add
+                balance += (t.type === "credit" ? -t.amount : t.amount);
+
                 const row = document.createElement('tr');
                 row.innerHTML = `
+          <td>${index + 1}</td>
           <td>${t.desc}</td>
           <td class="${t.type}">${t.type.toUpperCase()}</td>
           <td class="${t.type}">₹${t.amount}</td>
+          <td><button class="delete-btn" onclick="deleteTransaction(${index})">Delete</button></td>
         `;
                 table.appendChild(row);
-                balance += (t.type === "credit" ? t.amount : -t.amount);
             });
             balanceEl.textContent = "Balance: ₹" + balance;
             localStorage.setItem("cashbook", JSON.stringify(transactions));
+        }
+
+        function deleteTransaction(index) {
+            transactions.splice(index, 1);
+            renderTransactions();
         }
 
         form.addEventListener('submit', function(e) {
@@ -207,24 +222,39 @@
             form.reset();
         });
 
-        // Export as PDF
+        // Export as PDF with columns
         exportBtn.addEventListener('click', () => {
             const {
                 jsPDF
             } = window.jspdf;
             const doc = new jsPDF();
             doc.setFont("helvetica", "bold");
-            doc.setFontSize(18);
-            doc.text("Day-to-Day Cash Recorder - Made by Ayush Das", 20, 20);
+            doc.setFontSize(16);
+            doc.text("Day-to-Day Cash Recorder", 20, 20);
 
-            doc.setFontSize(12);
-            let y = 40;
-            transactions.forEach((t, i) => {
-                doc.text(`${i+1}. ${t.desc} - ${t.type.toUpperCase()} - ₹${t.amount}`, 20, y);
-                y += 10;
+            let runningBalance = 0;
+            const rows = transactions.map((t, i) => {
+                if (t.type === "credit") {
+                    runningBalance -= t.amount;
+                    return [i + 1, t.desc, "₹" + t.amount, "-", "₹" + runningBalance];
+                } else {
+                    runningBalance += t.amount;
+                    return [i + 1, t.desc, "-", "₹" + t.amount, "₹" + runningBalance];
+                }
             });
 
-            doc.text(`Balance: ₹${balance}`, 20, y + 10);
+            doc.autoTable({
+                startY: 30,
+                head: [
+                    ["Sl. No", "Name/Description", "Credit (-)", "Debit (+)", "Balance"]
+                ],
+                body: rows,
+                theme: "grid",
+                headStyles: {
+                    fillColor: [30, 144, 255]
+                },
+            });
+
             doc.save("Day-to-Day-Cash-Recorder.pdf");
         });
 
