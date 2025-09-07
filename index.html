@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Day-to-Day Cash Recorder - Made by Ayush Das</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #000;
+            /* Black background */
+            color: #e0e0e0;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #1e90ff;
+            /* Blue heading */
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        
+        .tagline {
+            text-align: center;
+            font-size: 1rem;
+            color: #87cefa;
+            /* Lighter blue */
+            margin-bottom: 25px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: #111;
+            /* Dark panel */
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(30, 144, 255, 0.4);
+        }
+        
+        form {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        
+        input,
+        select,
+        button {
+            padding: 12px;
+            font-size: 1rem;
+            border-radius: 6px;
+            border: none;
+            outline: none;
+            flex: 1;
+            font-weight: bold;
+        }
+        
+        input,
+        select {
+            background: #222;
+            color: #fff;
+        }
+        
+        button {
+            background: #1e90ff;
+            color: #fff;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        
+        button:hover {
+            background: #0b61c4;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        
+        th,
+        td {
+            padding: 12px;
+            text-align: center;
+            border-bottom: 1px solid #333;
+        }
+        
+        th {
+            color: #1e90ff;
+        }
+        
+        .credit {
+            color: #00ffcc;
+            font-weight: bold;
+        }
+        
+        .debit {
+            color: #ff4444;
+            font-weight: bold;
+        }
+        
+        .balance {
+            margin-top: 20px;
+            font-size: 1.3rem;
+            text-align: right;
+            color: #1e90ff;
+            font-weight: bold;
+        }
+        
+        .footer {
+            margin-top: 25px;
+            text-align: center;
+            font-size: 0.9rem;
+            color: #87cefa;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Day-to-Day Cash Recorder</h1>
+        <p class="tagline">💡 Made by <strong>Ayush Das</strong></p>
+
+        <!-- Form -->
+        <form id="transactionForm">
+            <input type="text" id="desc" placeholder="Description" required>
+            <input type="number" id="amount" placeholder="Amount" required>
+            <select id="type">
+        <option value="credit">Credit</option>
+        <option value="debit">Debit</option>
+      </select>
+            <button type="submit">Add</button>
+        </form>
+
+        <!-- Table -->
+        <table>
+            <thead>
+                <tr>
+                    <th>Description</th>
+                    <th>Type</th>
+                    <th>Amount</th>
+                </tr>
+            </thead>
+            <tbody id="transactionTable"></tbody>
+        </table>
+
+        <!-- Balance -->
+        <div class="balance" id="balance">Balance: ₹0</div>
+
+        <!-- PDF Export -->
+        <button id="exportPDF" style="margin-top:20px;width:100%;">📄 Export as PDF</button>
+
+        <p class="footer">Day-to-Day Cash Recorder • Works on any device 🌍</p>
+    </div>
+
+    <!-- jsPDF Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <script>
+        const form = document.getElementById('transactionForm');
+        const table = document.getElementById('transactionTable');
+        const balanceEl = document.getElementById('balance');
+        const exportBtn = document.getElementById('exportPDF');
+
+        let balance = 0;
+        let transactions = JSON.parse(localStorage.getItem("cashbook")) || [];
+
+        function renderTransactions() {
+            table.innerHTML = "";
+            balance = 0;
+            transactions.forEach(t => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+          <td>${t.desc}</td>
+          <td class="${t.type}">${t.type.toUpperCase()}</td>
+          <td class="${t.type}">₹${t.amount}</td>
+        `;
+                table.appendChild(row);
+                balance += (t.type === "credit" ? t.amount : -t.amount);
+            });
+            balanceEl.textContent = "Balance: ₹" + balance;
+            localStorage.setItem("cashbook", JSON.stringify(transactions));
+        }
+
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const desc = document.getElementById('desc').value;
+            const amount = parseFloat(document.getElementById('amount').value);
+            const type = document.getElementById('type').value;
+
+            if (isNaN(amount) || amount <= 0) {
+                alert("Enter a valid amount");
+                return;
+            }
+
+            transactions.push({
+                desc,
+                amount,
+                type
+            });
+            renderTransactions();
+            form.reset();
+        });
+
+        // Export as PDF
+        exportBtn.addEventListener('click', () => {
+            const {
+                jsPDF
+            } = window.jspdf;
+            const doc = new jsPDF();
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(18);
+            doc.text("Day-to-Day Cash Recorder - Made by Ayush Das", 20, 20);
+
+            doc.setFontSize(12);
+            let y = 40;
+            transactions.forEach((t, i) => {
+                doc.text(`${i+1}. ${t.desc} - ${t.type.toUpperCase()} - ₹${t.amount}`, 20, y);
+                y += 10;
+            });
+
+            doc.text(`Balance: ₹${balance}`, 20, y + 10);
+            doc.save("Day-to-Day-Cash-Recorder.pdf");
+        });
+
+        // Load existing
+        renderTransactions();
+    </script>
+</body>
+
+</html>
